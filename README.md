@@ -86,7 +86,8 @@ install.packages(c(
 
 ### ICN analysis
 
-![image-20260312094122081](README.assets/image-20260312094122081.png)
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/2d35df1f-d90c-4bb2-8443-9e2e9b5950bc" />
+
 
 ------
 
