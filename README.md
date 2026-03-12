@@ -79,7 +79,8 @@ install.packages(c(
 
 ### Introduction interface
 
-![image-20260312094025140](README.assets/image-20260312094025140.png)
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/1fdb0a6d-b17e-42eb-b8cd-d1acbf84c95c" />
 
 
 
