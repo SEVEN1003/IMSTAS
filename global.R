@@ -7,7 +7,8 @@ library(colourpicker)
 library(shinyWidgets)  
 library(tidyverse)
 library(readxl)
-
+library(clinfun)
+library(SCP) # plot sc and set width height
 options(shiny.error = function() {
   showModal(modalDialog(
     title = "Unexpected Error",
@@ -29,14 +30,14 @@ load('data/All_array.rdata')
 load('data/array_sample_info_all.rdata')
 
 # altas
-library(SCP)
+
 muscle_core_altas = readRDS('data/muscle_core_altas.rds')
 
 # all genes
 load('./data/all_genes.rdata')
 
 # gtex
-library(clinfun)
+
 load('./data/gtex_muscle_clean.rdata')
 gtex_gene = colnames(gtex_muscle_tpm)
 # 使用read.table函数读取数据

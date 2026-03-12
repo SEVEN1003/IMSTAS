@@ -5,21 +5,23 @@ introduction_tab = bs4TabItem(
     column(
       12,
       tags$img(
-        src = "intro_image.jpg",
+        src = "图片1.png",
         height = "400px",
         style = "display: block; margin: auto;"
-      )  # 图片居中显示
+      )
     ),
     column(
       12,
-      h3("Project Introduction"),
+      h3("IMSTAS Introduction"),
       p(
-        "Based on public databases and team self-test data, establish a fast, convenient, personalized and interactive online omics analysis application and database. The application is designed to be used by a research team proficient in the principles and practice of multi-omics, focusing on chronic diseases. The core team currently consists of 11 people, specializing in various related organs or tissues such as skeletal muscle, brain, heart, kidney, liver, fat, pancreas, and bone marrow. The project places a strong emphasis on NRFs (transcription, protein, regulatory network, different tissues, different cells, different stages of healthy development or disease development), aiming for significant publication and output."
+        "IMSTAS的设计目标在于整合并检索预计算分析结果，从而快速筛选骨骼肌稳态维持及萎缩相关调控因子，并系统解析其在多种生理及疾病状态下的表达特征、ICN HC网络，以及其所参与的关键生物学功能与信号通路。依托上述模块化且连贯的一体化分析流程，IMSTAS可完整支持从关键调控因子筛选、年龄相关基因表达趋势分析、跨状态DEA查询和可视化、单细胞/单核水平组间DEA、基因-基因及变量相关性分析，到ICN构建与功能富集分析的全链条研究，为系统性挖掘骨骼肌稳态维持与萎缩驱动因子及其下游调控网络提供了高效、统一的分析框架。"
+      ),
+      p(
+        "IMSTAS is designed to integrate and retrieve precomputed analytical results to rapidly identify regulatory factors involved in skeletal muscle homeostasis maintenance and atrophy. It systematically characterizes their expression patterns across diverse physiological and pathological conditions, as well as their associated ICN/HC networks, biological functions, and signaling pathways. Through a modular and coherent analytical framework, IMSTAS supports the full workflow from key regulator screening, age-related gene expression trend analysis, cross-condition DEA querying and visualization, single-cell/single-nucleus group-wise DEA, gene–gene and variable correlation analysis, to ICN construction and functional enrichment analysis. This integrated platform provides an efficient and unified framework for systematically uncovering drivers of skeletal muscle homeostasis and atrophy and their downstream regulatory networks."
       )
     )
   )
 )
-
 
 
 
@@ -30,7 +32,7 @@ single_class_tab <- bs4TabItem(
   
   # 第一行：输入组件
   bs4Card(
-    title = "Trend Analysis Inputs",
+    title = "Analysis Inputs",
     status = "primary",
     solidHeader = TRUE,
     width = 12,            # 占满页面宽度
@@ -58,7 +60,7 @@ single_class_tab <- bs4TabItem(
   
   # 第二行：加载并显示 bulk_deg_summary 数据框
   bs4Card(
-    title = "Bulk DEG Summary",
+    title = "DEG Summary",
     status = "info",
     solidHeader = TRUE,
     width = 12,
@@ -74,7 +76,7 @@ single_class_tab <- bs4TabItem(
   
   # 第二行：图形输出
   bs4Card(
-    title = "Trend Analysis Results",
+    title = "DEA Table & Plots",
     status = "info",
     solidHeader = TRUE,
     width = NULL,
@@ -113,7 +115,7 @@ single_class_tab <- bs4TabItem(
   
   # 第三行：表格输出
   bs4Card(
-    title = "Median Difference Results",
+    title = "Correlation Analysis Plot",
     status = "success",
     solidHeader = TRUE,
     width = NULL,
@@ -159,8 +161,8 @@ all_datasets_tab = bs4TabItem(
       ),
       column(3,
              selectInput("confidence_threshold_cor_input", "Select Confidence Threshold:", 
-                         choices = c(0.5, 0.75, 0.9),
-                         selected = 0.75)
+                         choices = c(0.5, 0.75, 0.9,0.95),
+                         selected = 0.9)
       )
     ),
     fluidRow(
@@ -264,7 +266,7 @@ micro_single_class_tab = bs4TabItem(
   
   # 第一行：输入组件
   bs4Card(
-    title = "Microarray Trend Analysis Inputs",
+    title = "Analysis Inputs",
     status = "primary",
     solidHeader = TRUE,
     width = 12,            # 占满页面宽度
@@ -292,7 +294,7 @@ micro_single_class_tab = bs4TabItem(
   
   # 第二行：加载并显示 array_deg_summary 数据框
   bs4Card(
-    title = "Microarray DEG Summary",
+    title = "DEG Summary",
     status = "info",
     solidHeader = TRUE,
     width = 12,
@@ -308,7 +310,7 @@ micro_single_class_tab = bs4TabItem(
   
   # 第二行：图形输出
   bs4Card(
-    title = "Microarray Trend Analysis Results",
+    title = "DEA Table & Plots",
     status = "info",
     solidHeader = TRUE,
     width = NULL,
@@ -336,7 +338,7 @@ micro_single_class_tab = bs4TabItem(
   
   # 第三行：表格输出
   bs4Card(
-    title = "Microarray Median Difference Results",
+    title = "Correlation Analysis Plot",
     status = "success",
     solidHeader = TRUE,
     width = NULL,
@@ -380,7 +382,7 @@ micro_all_datasets_tab = bs4TabItem(
       ),
       column(3,
              selectInput("micro_confidence_threshold_cor_input", "Select Confidence Threshold:", 
-                         choices = c(0.5, 0.75, 0.9),
+                         choices = c(0.5, 0.75, 0.9,0.95),
                          selected = 0.5)
       )
     ),

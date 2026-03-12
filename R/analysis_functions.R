@@ -171,12 +171,11 @@ calculate_array_group_median_difference_by_class <- function(Class,
 
 
 # all_datasets analysis-----------------------
-# step1函数 计算相关------------------------
-calculate_gene_correlations <- function(given_gene, Class = "All", 
-                                        threshold = 1, 
-                                        cor_threshold = 0.5, 
+# RNA step1 (fast + robust) ------------------------
+calculate_gene_correlations <- function(given_gene, Class = "All",
+                                        threshold = 1,
+                                        cor_threshold = 0.5,
                                         pvalue_threshold = 0.05) {
-  # 加载必要的库
   library(dplyr)
   
   # 获取GSE列表
@@ -187,153 +186,196 @@ calculate_gene_correlations <- function(given_gene, Class = "All",
     gse_list <- class_gse
   }
   
-  # 初始化结果列表
   results_list <- list()
   
-  # 遍历每个GSE
   for (GSE in gse_list) {
-    qc_tpm_samples <- tpm_samples_list[[GSE]]
-    exp_qc <- as.matrix(qc_tpm_samples)
+    exp_qc <- as.matrix(tpm_samples_list[[GSE]])
+    if (is.null(exp_qc) || nrow(exp_qc) == 0 || ncol(exp_qc) < 3) next
+    if (is.null(rownames(exp_qc))) next
     
-    # 检查给定基因是否存在于当前 GSE 数据中
+    # 检查 given_gene
     if (!(given_gene %in% rownames(exp_qc))) {
       message(paste("Given gene", given_gene, "not found in GSE", GSE, "- Skipping."))
-      next  # 如果不存在，跳过该 GSE
+      next
     }
     
-    # 过滤低表达基因
-    exp_qc_high <- exp_qc[rowMeans(exp_qc) > threshold, ]
+    # 过滤低表达（na.rm + drop=FALSE 防报错）
+    exp_qc_high <- exp_qc[rowMeans(exp_qc, na.rm = TRUE) > threshold, , drop = FALSE]
+    if (nrow(exp_qc_high) < 2) next
     
-    # 再次检查给定基因是否存在于过滤后的数据中
     if (!(given_gene %in% rownames(exp_qc_high))) {
       message(paste("Given gene", given_gene, "not found in high expression genes for GSE", GSE, "- Skipping."))
-      next  # 如果不存在，跳过该 GSE
+      next
     }
     
-    # 初始化一个空的数据框来保存结果
-    results_df <- data.frame(Gene = character(), Correlation = numeric(), PValue = numeric(), stringsAsFactors = FALSE)
+    # given gene 向量
+    x <- as.numeric(exp_qc_high[given_gene, ])
+    ok_x <- !is.na(x)
+    if (sum(ok_x) < 3) next
     
-    # 计算与给定基因的相关性
-    for (gene in rownames(exp_qc_high)) {
-      if (gene != given_gene && nchar(gene) > 1) {
-        # 计算Pearson相关性
-        test <- cor.test(exp_qc_high[given_gene, ], exp_qc_high[gene, ])
-        
-        if (!is.na(test$estimate) && !is.na(test$p.value)) {
-          # 保留相关性和显著性满足条件的结果
-          if (test$estimate > cor_threshold && test$p.value < pvalue_threshold) {
-            results_df <- rbind(results_df, c(Gene = gene, Correlation = test$estimate, PValue = test$p.value))
-          }
-        }
-      }
-    }
+    # 候选基因（去掉自身 + 名字过滤）
+    genes <- rownames(exp_qc_high)
+    genes <- genes[genes != given_gene & nchar(genes) > 1]
+    if (length(genes) == 0) next
     
-    # 检查是否有结果，如果没有则跳过
-    if (nrow(results_df) == 0) {
+    mat <- exp_qc_high[genes, ok_x, drop = FALSE]
+    x2  <- x[ok_x]
+    if (ncol(mat) < 3 || nrow(mat) == 0) next
+    
+    # 每行有效样本数（该行非NA；x2 已无 NA）
+    ok_mat <- !is.na(mat)
+    n_i <- rowSums(ok_mat)
+    keep_n <- which(n_i >= 3)
+    if (length(keep_n) == 0) next
+    
+    mat2 <- mat[keep_n, , drop = FALSE]
+    ok2  <- ok_mat[keep_n, , drop = FALSE]
+    n2   <- n_i[keep_n]
+    gene_names2 <- rownames(mat2)
+    
+    # ---- 向量化 Pearson r（pairwise：每行按自身非NA）----
+    x_centered <- x2 - mean(x2, na.rm = TRUE)
+    
+    row_means <- rowSums(mat2, na.rm = TRUE) / n2
+    mat_centered <- mat2 - row_means
+    mat_centered[!ok2] <- 0
+    
+    cov_num <- as.vector(mat_centered %*% x_centered)
+    ss_y <- rowSums(mat_centered^2)
+    ss_x <- sum(x_centered^2)
+    
+    r <- cov_num / sqrt(pmax(1e-12, ss_y) * pmax(1e-12, ss_x))
+    r[!is.finite(r)] <- NA_real_
+    
+    # p值（Pearson t 检验）
+    tstat <- r * sqrt((n2 - 2) / pmax(1e-12, 1 - r^2))
+    pvals <- 2 * pt(-abs(tstat), df = n2 - 2)
+    
+    keep <- which(!is.na(r) & r > cor_threshold & !is.na(pvals) & pvals < pvalue_threshold)
+    if (length(keep) == 0) {
       message(paste("No significant correlations found for GSE", GSE, "with gene", given_gene, "- Skipping."))
       next
     }
     
-    # 将基因名设置为行名并保存结果
-    colnames(results_df) <- c('Gene', 'Correlation', 'PValue')
+    results_df <- data.frame(
+      Gene = gene_names2[keep],
+      Correlation = as.numeric(r[keep]),
+      PValue = as.numeric(pvals[keep]),
+      stringsAsFactors = FALSE
+    )
     rownames(results_df) <- results_df$Gene
-    results_df$Correlation <- as.numeric(results_df$Correlation)
-    results_df$PValue <- as.numeric(results_df$PValue)
     
-    # 保存结果到列表中
     results_list[[GSE]] <- results_df
   }
   
-  # 保存结果到文件
-  save(results_list, file = paste0("data/", given_gene, '_',Class, "_cor_list.rdata"))
-  
-  return(results_list)
+  save(results_list, file = paste0("data/", given_gene, "_", Class, "_cor_list.rdata"))
+  results_list
 }
-
-# array step1--------------
-array_calculate_gene_correlations <- function(given_gene, Class = "All", 
-                                              threshold = 0.5, 
-                                              cor_threshold = 0.5, 
+# array step1 (fast + robust) --------------
+array_calculate_gene_correlations <- function(given_gene, Class = "All",
+                                              threshold = 0.5,
+                                              cor_threshold = 0.5,
                                               pvalue_threshold = 0.05) {
-  # 加载必要的库
   library(dplyr)
   
   # 获取GSE列表
   if (Class == "All") {
     gse_list <- names(array_exp_list)
   } else {
-    class_gse <- array_sample_info_all$GSE[array_sample_info_all$Class == Class] %>% unique()
-    gse_list <- class_gse
+    gse_list <- array_sample_info_all$GSE[array_sample_info_all$Class == Class] %>% unique()
   }
   
-  # 初始化结果列表
   results_list <- list()
   
-  # 遍历每个GSE
   for (GSE in gse_list) {
-    qc_tpm_samples <- array_exp_list[[GSE]]
-    exp_qc <- as.matrix(qc_tpm_samples)
+    exp_qc <- as.matrix(array_exp_list[[GSE]])
+    if (is.null(exp_qc) || nrow(exp_qc) == 0 || ncol(exp_qc) < 3) next
+    if (is.null(rownames(exp_qc))) next
     
-    # 检查给定基因是否存在于当前 GSE 数据中
+    # 检查给定基因是否存在
     if (!(given_gene %in% rownames(exp_qc))) {
       message(paste("Given gene", given_gene, "not found in GSE", GSE, "- Skipping."))
-      next  # 如果不存在，跳过该 GSE
+      next
     }
     
-    # 过滤低表达基因
-    exp_qc_high <- exp_qc[rowMeans(exp_qc) > threshold, ]
+    # 过滤低表达（na.rm 防止 rowMeans 遇 NA 变 NA；drop=FALSE 防止维度坍塌）
+    exp_qc_high <- exp_qc[rowMeans(exp_qc, na.rm = TRUE) > threshold, , drop = FALSE]
+    if (nrow(exp_qc_high) < 2) next
     
-    # 再次检查给定基因是否存在于过滤后的数据中
     if (!(given_gene %in% rownames(exp_qc_high))) {
       message(paste("Given gene", given_gene, "not found in high expression genes for GSE", GSE, "- Skipping."))
-      next  # 如果不存在，跳过该 GSE
+      next
     }
     
-    # 初始化一个空的数据框来保存结果
-    results_df <- data.frame(Gene = character(), Correlation = numeric(), PValue = numeric(), stringsAsFactors = FALSE)
+    # 给定基因表达向量
+    x <- as.numeric(exp_qc_high[given_gene, ])
+    ok_x <- !is.na(x)
+    if (sum(ok_x) < 3) next
     
-    # 计算与给定基因的相关性
-    for (gene in rownames(exp_qc_high)) {
-      if (gene != given_gene && nchar(gene) > 1) {
-        # 计算Pearson相关性
-        test <- cor.test(exp_qc_high[given_gene, ], exp_qc_high[gene, ])
-        
-        if (!is.na(test$estimate) && !is.na(test$p.value)) {
-          # 保留相关性和显著性满足条件的结果
-          if (test$estimate > cor_threshold && test$p.value < pvalue_threshold) {
-            results_df <- rbind(results_df, c(Gene = gene, Correlation = test$estimate, PValue = test$p.value))
-          }
-        }
-      }
-    }
+    # 候选基因矩阵（去掉自身；顺便过滤掉奇怪的空/1字符名）
+    genes <- rownames(exp_qc_high)
+    genes <- genes[genes != given_gene & nchar(genes) > 1]
+    if (length(genes) == 0) next
     
-    # 检查是否有结果，如果没有则跳过
-    if (nrow(results_df) == 0) {
+    mat <- exp_qc_high[genes, ok_x, drop = FALSE]
+    x2  <- x[ok_x]
+    if (ncol(mat) < 3 || nrow(mat) == 0) next
+    
+    # 每个基因的有效样本数（该行非NA的列数；x2 已无 NA）
+    ok_mat <- !is.na(mat)
+    n_i <- rowSums(ok_mat)
+    keep_n <- which(n_i >= 3)
+    if (length(keep_n) == 0) next
+    
+    mat2 <- mat[keep_n, , drop = FALSE]
+    ok2  <- ok_mat[keep_n, , drop = FALSE]
+    n2   <- n_i[keep_n]
+    gene_names2 <- rownames(mat2)
+    
+    # ---- 向量化计算 Pearson r（pairwise：按每行自己的非NA）----
+    x_centered <- x2 - mean(x2, na.rm = TRUE)
+    
+    row_means <- rowSums(mat2, na.rm = TRUE) / n2
+    mat_centered <- mat2 - row_means
+    mat_centered[!ok2] <- 0
+    
+    cov_num <- as.vector(mat_centered %*% x_centered)
+    ss_y <- rowSums(mat_centered^2)
+    ss_x <- sum(x_centered^2)
+    
+    r <- cov_num / sqrt(pmax(1e-12, ss_y) * pmax(1e-12, ss_x))
+    r[!is.finite(r)] <- NA_real_
+    
+    # p值（与 cor.test 的 Pearson 对应：t = r*sqrt((n-2)/(1-r^2))）
+    tstat <- r * sqrt((n2 - 2) / pmax(1e-12, 1 - r^2))
+    pvals <- 2 * pt(-abs(tstat), df = n2 - 2)
+    
+    keep <- which(!is.na(r) & r > cor_threshold & !is.na(pvals) & pvals < pvalue_threshold)
+    if (length(keep) == 0) {
       message(paste("No significant correlations found for GSE", GSE, "with gene", given_gene, "- Skipping."))
       next
     }
     
-    # 将基因名设置为行名并保存结果
-    colnames(results_df) <- c('Gene', 'Correlation', 'PValue')
+    results_df <- data.frame(
+      Gene = gene_names2[keep],
+      Correlation = as.numeric(r[keep]),
+      PValue = as.numeric(pvals[keep]),
+      stringsAsFactors = FALSE
+    )
     rownames(results_df) <- results_df$Gene
-    results_df$Correlation <- as.numeric(results_df$Correlation)
-    results_df$PValue <- as.numeric(results_df$PValue)
     
-    # 保存结果到列表中
     results_list[[GSE]] <- results_df
   }
   
-  # 保存结果到文件
-  save(results_list, file = paste0("data/", given_gene, '_',Class, "_array_cor_list.rdata"))
-  
-  return(results_list)
+  save(results_list, file = paste0("data/", given_gene, "_", Class, "_array_cor_list.rdata"))
+  results_list
 }
-
-
 # step2函数 汇总相关--------------
-create_gene_summary <- function(correlation_results, 
+create_gene_summary <- function(
+                                correlation_results, 
                                 filter_threshold = 0.1, 
-                                confidence_threshold = 0.75) {
+                                confidence_threshold = 0.75,
+                                given_gene) {
   combined_results <- data.frame(Gene = character(), 
                                  Correlation = numeric(), 
                                  PValue = numeric(), 
@@ -389,17 +431,20 @@ create_gene_summary <- function(correlation_results,
   print(total_samples)
   print(table(gene_summary$Filter))
   print(table(gene_summary$Confidence))
+  save(gene_summary, file = paste0('data/',given_gene,'_icn_summary.rdata'))
   
-  save(gene_summary, file = 'data/gene_summary.rdata')
+  # save(gene_summary, file = 'data/gene_summary.rdata')
   return(gene_summary)
   
   
 }
 
 # array汇总-------------
-array_create_gene_summary <- function(correlation_results, 
+array_create_gene_summary <- function(
+                                      correlation_results, 
                                       filter_threshold = 0.1, 
-                                      confidence_threshold = 0.5) {
+                                      confidence_threshold = 0.5,
+                                      given_gene) {
   combined_results <- data.frame(Gene = character(), 
                                  Correlation = numeric(), 
                                  PValue = numeric(), 
@@ -464,13 +509,16 @@ array_create_gene_summary <- function(correlation_results,
   print(table(gene_summary$Confidence))
   
   # 保存基因汇总结果
-  save(gene_summary, file = 'data/array_gene_summary.rdata')
+  # save(gene_summary, file = 'data/array_gene_summary.rdata')
+  save(gene_summary, file = paste0('data/',given_gene,'_array_icn_summary.rdata'))
   
   return(gene_summary)
 }
 
 # step3 基因功能注释--------------------
-perform_ora <- function(gene_summary_result) {
+perform_ora <- function(
+                        gene_summary_result,
+                        given_gene) {
   library(clusterProfiler)
   library(stringr)
   
@@ -496,14 +544,17 @@ perform_ora <- function(gene_summary_result) {
     
     ora_list[[gmt]] <- em_df
   }
+  save(ora_list, file = paste0('data/',given_gene,'_ora_list.rdata'))
   
-  save(ora_list, file = 'data/ora_list.rdata')
+  # save(ora_list, file = 'data/ora_list.rdata')
   return(ora_list)
   
 }
 
 # array 注释-----------
-array_perform_ora <- function(gene_summary_result) {
+array_perform_ora <- function(
+                              gene_summary_result,
+                              given_gene) {
   library(clusterProfiler)
   library(stringr)
   
@@ -528,8 +579,9 @@ array_perform_ora <- function(gene_summary_result) {
     
     ora_list[[gmt]] <- em_df
   }
+  save(ora_list, file = paste0('data/',given_gene,'_array_ora_list.rdata'))
   
-  save(ora_list, file = 'data/array_ora_list.rdata')
+  # save(ora_list, file = 'data/array_ora_list.rdata')
   return(ora_list)
 }
 

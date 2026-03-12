@@ -336,7 +336,7 @@ server <- function(input, output, session) {
       correlation_results <- results_list  # 假设文件中有该对象
     } else {
       # 提示开始计算相关网络
-      showNotification("Starting calculation of the correlation network...This may take approximately 10 minutes.", type = "warning", duration = 60)
+      showNotification("Starting calculation of the correlation network...This may take approximately 10s.", type = "warning", duration = 60)
       
       # 开始计算
       correlation_results <- calculate_gene_correlations(given_gene, Class = Class)
@@ -347,9 +347,10 @@ server <- function(input, output, session) {
     
     gene_summary_result <- create_gene_summary(correlation_results,
                                                filter_threshold = filter_threshold,
-                                               confidence_threshold = confidence_threshold)
+                                               confidence_threshold = confidence_threshold,
+                                               given_gene = given_gene)
     
-    ora_results <- perform_ora(gene_summary_result)
+    ora_results <- perform_ora(gene_summary_result,given_gene = given_gene)
     ora_barplot_list <- plot_enrich_bar_list(ora_results)
     
     total_studies <- as.numeric(length(correlation_results))
@@ -364,10 +365,12 @@ server <- function(input, output, session) {
       )
     })
     
-    # 表格下载功能
     output$download_cor_table <- downloadHandler(
       filename = function() {
-        paste("Correlation_Table_", Sys.Date(), ".csv", sep = "")
+        method_tag <- "ICN"
+        data_tag   <- "RNA"
+        gene_tag   <- gsub("[^A-Za-z0-9._-]+", "_", input$gene_cor_input)
+        paste0(method_tag, "_", data_tag, "_", gene_tag, ".csv")
       },
       content = function(file) {
         write.csv(gene_summary_result, file, row.names = FALSE)
@@ -480,7 +483,7 @@ server <- function(input, output, session) {
       correlation_results <- results_list  # 假设文件中有该对象
     } else {
       # 提示开始计算相关网络
-      showNotification("Starting calculation of the correlation network...This may take approximately 10 minutes.", type = "warning", duration = 60)
+      showNotification("Starting calculation of the correlation network...This may take approximately 10s.", type = "warning", duration = 60)
       
       # 开始计算
       correlation_results <- array_calculate_gene_correlations(given_gene, 
@@ -492,9 +495,11 @@ server <- function(input, output, session) {
     
     gene_summary_result <- array_create_gene_summary(correlation_results,
                                                      filter_threshold = filter_threshold,
-                                                     confidence_threshold = confidence_threshold)
+                                                     confidence_threshold = confidence_threshold,
+                                                     given_gene = given_gene)
     
-    ora_results <- array_perform_ora(gene_summary_result)
+    ora_results <- array_perform_ora(gene_summary_result,
+                                     given_gene = given_gene)
     ora_barplot_list <- array_plot_enrich_bar_list(ora_results)
     
     total_studies <- as.numeric(length(correlation_results))
@@ -509,10 +514,13 @@ server <- function(input, output, session) {
       )
     })
     
-    # 表格下载功能
+    # 表格下载功能（Array；不含日期）
     output$micro_download_cor_table <- downloadHandler(
       filename = function() {
-        paste("Correlation_Table_", Sys.Date(), ".csv", sep = "")
+        method_tag <- "ICN"
+        data_tag   <- "Array"
+        gene_tag   <- gsub("[^A-Za-z0-9._-]+", "_", input$micro_gene_cor_input)
+        paste0(method_tag, "_", data_tag, "_", gene_tag, ".csv")
       },
       content = function(file) {
         write.csv(gene_summary_result, file, row.names = FALSE)

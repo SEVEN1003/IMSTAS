@@ -4,7 +4,7 @@ ui <- dashboardPage(
   # basic-------------------
   controlbar = NULL,
   footer = NULL,
-  title = "SMDB",
+  title = "IMSTAS",
   fullscreen = TRUE,
   help = TRUE,
   dark = FALSE,
@@ -13,7 +13,7 @@ ui <- dashboardPage(
   # header--------------
   header = dashboardHeader(
     title = dashboardBrand(
-      title = "SMDB-V1",
+      title = "IMSTAS-V1",
       color = "success",
       image = "cmu_phs.png",
       href = "https://www.cmu.edu.cn/ggwsxy/"
@@ -35,16 +35,14 @@ ui <- dashboardPage(
       # Introduction 菜单
       menuItem("Introduction", tabName = "introduction", icon = shiny::icon("info-circle")),
       
-      # RNA-seq 菜单
       menuItem("RNA-seq", tabName = "rna_seq", icon = shiny::icon("dna"), 
-               menuSubItem("GTEx-SM", tabName = "gtex_sm"),  # 将 GTEx-SM 移到第一个子菜单
-               menuSubItem("Single Class", tabName = "single_class"),
-               menuSubItem("All Datasets", tabName = "all_datasets")),
+               menuSubItem("GTEx-SM", tabName = "gtex_sm"),
+               menuSubItem("DEA", tabName = "single_class"),
+               menuSubItem("ICN", tabName = "all_datasets")),
       
-      # Microarray 菜单
       menuItem("Microarray", tabName = "microarray", icon = shiny::icon("microchip"), 
-               menuSubItem("Single Class", tabName = "micro_single_class"),
-               menuSubItem("All Datasets", tabName = "micro_all_datasets")),
+               menuSubItem("DEA", tabName = "micro_single_class"),
+               menuSubItem("ICN", tabName = "micro_all_datasets")),
       
      
       # Sc/sn RNA-seq Atlas 菜单
